@@ -1,26 +1,66 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+ * ManagerOX CRM design tokens.
+ *
+ * The brand palette is kept byte-identical to the marketing site
+ * (managerox-web/app/globals.css) so the two properties read as one product.
+ * Tailwind v4's OKLCH defaults render a shade off these, so they're pinned.
+ */
+@theme {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+
+  /* Brand blues */
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-200: #bfdbfe;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-blue-800: #1e40af;
+
+  /* Neutrals */
+  --color-slate-50: #f8fafc;
+  --color-slate-100: #f1f5f9;
+  --color-slate-200: #e2e8f0;
+  --color-slate-300: #cbd5e1;
+  --color-slate-400: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1e293b;
+  --color-slate-900: #0f172a;
+
+  /* Accents — stat tiles and status */
+  --color-green-100: #dcfce7;
+  --color-green-600: #16a34a;
+  --color-orange-100: #ffedd5;
+  --color-orange-600: #ea580c;
+  --color-violet-100: #ede9fe;
+  --color-violet-600: #7c3aed;
+  --color-red-500: #ef4444;
+  --color-red-600: #dc2626;
+
+  /* Surfaces */
+  --color-hairline: #eef2f7;
+  --color-canvas: #f7f9fc;
+
+  /*
+   * Pipeline stage ramp — ORDINAL, not categorical: stages are positions in a
+   * sequence, so they take one hue with monotone lightness steps rather than a
+   * rainbow. Validated with the dataviz validator (--ordinal, light surface):
+   * monotone L, all adjacent gaps >= 0.06, light end 2.06:1 vs surface, hue
+   * spread 15°. Do not substitute arbitrary hues — re-run the validator first.
+   */
+  --color-stage-1: #86b6ef;
+  --color-stage-2: #5598e7;
+  --color-stage-3: #2563eb;
+  --color-stage-4: #1e40af;
+  --color-stage-5: #172554;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Numeric columns align when figures are tabular. */
+.tnum {
+  font-variant-numeric: tabular-nums;
 }

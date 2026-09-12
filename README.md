@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ManagerOX CRM
 
-## Getting Started
-
-First, run the development server:
+The CRM application, intended for **app.managerox.com**. Next.js (App Router) +
+Tailwind CSS v4, sharing a brand palette with the marketing site
+([managerox-web](https://github.com/SaadAhmad915/managerox-web)).
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev     # http://localhost:3000
+npm run build
+npm start
+npm run lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Status
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+**Milestone 1 — app shell + dashboard.** The dashboard is complete and built to
+the product design. The other eight sidebar destinations are real routes
+rendering a placeholder, so navigation works end to end.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Route | State |
+| --- | --- |
+| `/` | Dashboard — stat tiles, pipeline funnel, revenue chart, tasks, leads, team |
+| `/leads` `/contacts` `/deals` `/tasks` | Placeholder |
+| `/calendar` `/reports` `/automation` `/settings` | Placeholder |
+| `/more` | Placeholder — phone tab bar overflow |
 
-## Learn More
+Not built yet: **authentication** (every route is currently public) and any
+write operations.
 
-To learn more about Next.js, take a look at the following resources:
+## Layout
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Path | What's in it |
+| --- | --- |
+| `app/layout.tsx` | Shell — sidebar, topbar, phone tab bar |
+| `app/page.tsx` | Dashboard |
+| `app/components/` | One component per card, plus `Icon` and nav chrome |
+| `app/lib/api.ts` | **The only place that talks to the backend** |
+| `app/lib/types.ts` | Domain types |
+| `app/lib/nav.ts` | Sidebar and tab-bar configuration |
+| `app/globals.css` | Design tokens — brand palette and the pipeline ramp |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Connecting the Laravel API
 
-## Deploy on Vercel
+`app/lib/api.ts` is the single seam. Every function is already `async` and
+returns domain types, so swapping mock data for real calls touches that file
+only — no component knows a URL or a response shape.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Three things matter when `api.managerox.com` lands:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `app.` and `api.` are different origins but the **same site**, so a session
+  cookie with `Domain=.managerox.com` and `SameSite=Lax` is sent on these
+  requests. `SameSite=None` is not needed.
+- Laravel needs CORS with an **explicit** origin (`https://app.managerox.com`,
+  never `*`) and `supports_credentials => true`.
+- Requests must send `credentials: "include"`.
+
+## Chart colours are validated, not decorative
+
+The pipeline ramp (`--color-stage-*` in `globals.css`) encodes an **ordinal**
+sequence — stages are ordered positions, so they take one hue stepped by
+lightness rather than a rainbow. The values pass a colour validator on monotone
+lightness, adjacent step separation, light-end contrast, and hue spread.
+
+The original mockup used five unrelated hues; two adjacent stages there sat at
+ΔE 8.6 for normal vision (floor is 15), meaning *Negotiation* and *Closed* were
+near-indistinguishable. **Re-run a validator before substituting colours here.**
