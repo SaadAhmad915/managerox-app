@@ -1,0 +1,19 @@
+{
+  // Use the TypeScript version from node_modules rather than VS Code's bundled
+  // one, so editor errors match what `pnpm build` reports.
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+
+  // Tailwind v4 has no tailwind.config.js — the CSS file is the config, so the
+  // IntelliSense extension needs pointing at it for class completion to work.
+  "tailwindCSS.experimental.configFile": "app/globals.css",
+
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.next": true,
+    "**/pnpm-lock.yaml": true
+  }
+}
