@@ -5,12 +5,30 @@ Tailwind CSS v4, sharing a brand palette with the marketing site
 ([managerox-web](https://github.com/SaadAhmad915/managerox-web)).
 
 ```bash
-npm install
-npm run dev     # http://localhost:3000
-npm run build
-npm start
-npm run lint
+pnpm install
+pnpm dev        # http://localhost:3000
+pnpm build
+pnpm start
+pnpm lint
 ```
+
+Requires **Node >= 20.9** (Next 16's floor). The pnpm version is pinned via the
+`packageManager` field, so `corepack enable` once and the right pnpm is used
+automatically — no global install needed.
+
+### Why `pnpm-workspace.yaml` exists
+
+Two pnpm policies need explicit, deliberate answers rather than being switched
+off:
+
+- `allowBuilds` — pnpm blocks dependency build scripts by default. `unrs-resolver`
+  (a native ESLint dependency) genuinely needs its build, so it's approved by name.
+- `minimumReleaseAgeExclude` — pnpm refuses packages published in roughly the last
+  24 hours, which is the window where a compromised release usually gets caught.
+  Next 16.3.5 shipped 2026-09-11 and tripped this. Rather than disabling the guard
+  for everything, the first-party Vercel packages we chose are excluded by name.
+  **Remove those entries once the version has aged past the window** — the guard is
+  worth keeping for everything else.
 
 ## Status
 
