@@ -5,30 +5,21 @@ Tailwind CSS v4, sharing a brand palette with the marketing site
 ([managerox-web](https://github.com/SaadAhmad915/managerox-web)).
 
 ```bash
-pnpm install
-pnpm dev        # http://localhost:3000
-pnpm build
-pnpm start
-pnpm lint
+npm install
+npm run dev     # http://localhost:3000
+npm run build
+npm start
+npm run lint
 ```
 
-Requires **Node >= 20.9** (Next 16's floor). The pnpm version is pinned via the
-`packageManager` field, so `corepack enable` once and the right pnpm is used
-automatically — no global install needed.
+Requires **Node >= 20.9** (Next 16's floor).
 
-### Why `pnpm-workspace.yaml` exists
-
-Two pnpm policies need explicit, deliberate answers rather than being switched
-off:
-
-- `allowBuilds` — pnpm blocks dependency build scripts by default. `unrs-resolver`
-  (a native ESLint dependency) genuinely needs its build, so it's approved by name.
-- `minimumReleaseAgeExclude` — pnpm refuses packages published in roughly the last
-  24 hours, which is the window where a compromised release usually gets caught.
-  Next 16.3.5 shipped 2026-09-11 and tripped this. Rather than disabling the guard
-  for everything, the first-party Vercel packages we chose are excluded by name.
-  **Remove those entries once the version has aged past the window** — the guard is
-  worth keeping for everything else.
+This project uses **npm**. It briefly used pnpm, but pnpm's Windows install path
+runs into enough friction (PowerShell execution policy, corepack needing
+Administrator to write into `C:\Program Files\nodejs`, and npm blocking pnpm's
+own install scripts) that npm is the better default for a mixed-OS team. If you
+switch back, delete `package-lock.json` in the same commit — never commit two
+lockfiles, or local installs and CI can silently resolve different trees.
 
 ## Status
 
