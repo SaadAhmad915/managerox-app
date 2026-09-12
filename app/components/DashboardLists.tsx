@@ -12,12 +12,15 @@ function CardShell({
   children: React.ReactNode;
 }) {
   return (
-    <section className="flex flex-col rounded-2xl border border-hairline bg-white p-5 sm:p-6">
+    /* min-w-0: grid items default to min-width:auto, and the `truncate` rows
+       below set white-space:nowrap — which still contributes full text width to
+       min-content, forcing the track wider than the viewport on small screens. */
+    <section className="flex min-w-0 flex-col rounded-2xl border border-hairline bg-white p-5 sm:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-[17px] font-extrabold text-slate-900">{title}</h2>
         <Link
           href={href}
-          className="text-[13px] font-bold text-blue-600 transition-colors hover:text-blue-700"
+          className="-my-1.5 shrink-0 py-1.5 text-[13px] font-bold text-blue-600 transition-colors hover:text-blue-700"
         >
           View All
         </Link>
@@ -110,7 +113,7 @@ export function TeamPerformance({ team }: { team: TeamMember[] }) {
                 {member.role}
               </span>
             </span>
-            <span className="flex w-[110px] shrink-0 items-center gap-2">
+            <span className="flex w-[76px] shrink-0 items-center gap-2 sm:w-[110px]">
               <span
                 className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100"
                 role="img"

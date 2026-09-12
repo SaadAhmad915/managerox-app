@@ -29,7 +29,7 @@ export function PipelineFunnel({ stages }: { stages: PipelineStage[] }) {
   const widthFor = (count: number) => (count / max) * VIEW_W;
 
   return (
-    <section className="rounded-2xl border border-hairline bg-white p-5 sm:p-6">
+    <section className="min-w-0 rounded-2xl border border-hairline bg-white p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-[17px] font-extrabold text-slate-900">
           Sales Pipeline

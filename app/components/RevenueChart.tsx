@@ -20,7 +20,7 @@ export function RevenueChart({ revenue }: { revenue: RevenueSeries }) {
   const max = 60_000_000;
 
   return (
-    <section className="rounded-2xl border border-hairline bg-white p-5 sm:p-6">
+    <section className="min-w-0 rounded-2xl border border-hairline bg-white p-5 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-[17px] font-extrabold text-slate-900">
           Monthly Revenue
