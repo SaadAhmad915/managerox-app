@@ -1,4 +1,9 @@
-/** Domain types shared by the UI and, later, the Laravel API client. */
+/**
+ * Domain types shared by the UI and the API client.
+ *
+ * `DashboardData` is also the contract app/api/dashboard/route.ts builds to —
+ * renaming a key here without changing it there breaks the dashboard silently.
+ */
 
 export type Trend = {
   /** Percentage change vs the comparison period, e.g. 12 for "+12%". */

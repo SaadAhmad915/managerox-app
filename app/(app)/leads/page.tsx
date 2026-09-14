@@ -27,12 +27,6 @@ const STATUS_DOT: Record<string, string> = {
   unqualified: "bg-slate-300",
 };
 
-function formatValue(value: number) {
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `${Math.round(value / 1_000)}K`;
-  return String(value);
-}
-
 export default function LeadsPage() {
   const [status, setStatus] = useState("");
   const [source, setSource] = useState("");
@@ -198,7 +192,7 @@ export default function LeadsPage() {
               <tr className="border-b border-hairline text-left text-[12px] font-bold tracking-[0.3px] text-slate-500 uppercase">
                 <th className="px-5 py-3">Lead</th>
                 <th className="px-5 py-3">Stage</th>
-                <th className="px-5 py-3 text-right">Value</th>
+                <th className="px-5 py-3">Owner</th>
                 <th className="px-5 py-3">Added</th>
                 <th className="px-5 py-3 text-right">Actions</th>
               </tr>
@@ -235,8 +229,8 @@ export default function LeadsPage() {
                       {lead.statusLabel}
                     </span>
                   </td>
-                  <td className="tnum px-5 py-3 text-right text-[13.5px] font-bold text-slate-900">
-                    {lead.value ? formatValue(lead.value) : "—"}
+                  <td className="px-5 py-3 text-[13px] whitespace-nowrap text-slate-700">
+                    {lead.owner?.name ?? "Unassigned"}
                   </td>
                   <td className="px-5 py-3 text-[12.5px] whitespace-nowrap text-slate-500">
                     {lead.receivedLabel}
@@ -278,7 +272,7 @@ export default function LeadsPage() {
                       className={`size-2 shrink-0 rounded-full ${STATUS_DOT[lead.status] ?? "bg-slate-300"}`}
                     />
                     {lead.statusLabel}
-                    {lead.value > 0 && ` · ${formatValue(lead.value)}`}
+                    {lead.owner && ` · ${lead.owner.name}`}
                   </span>
                 </span>
                 <RowActions

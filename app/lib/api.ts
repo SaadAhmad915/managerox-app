@@ -1,34 +1,19 @@
 import type { DashboardData } from "@/app/lib/types";
 
 /**
- * The only place that talks to the Laravel API.
+ * The only place that talks to the API.
  *
- * Auth is Sanctum's SPA cookie mode, so every request must send credentials and
- * state-changing requests must carry the XSRF header. Three rules follow, and
- * breaking any of them produces a silent 401 rather than an obvious error:
- *
- *  1. `credentials: "include"` on every call — without it the browser omits the
- *     session cookie and the API sees an anonymous request.
- *  2. `/sanctum/csrf-cookie` must be fetched once before the first POST.
- *  3. The API's Origin must appear in its SANCTUM_STATEFUL_DOMAINS, or Sanctum
- *     treats the request as stateless and never attaches a session at all.
+ * The API is this same app — the handlers under app/api — so every request is
+ * same-origin and the session cookie is first-party. That is what removed the
+ * whole class of silent 401s that comes from a cookie the browser quietly
+ * refuses to send to a different site.
  */
-
-/**
- * Empty on purpose: requests go to this app's own origin and next.config.ts
- * rewrites them to the API. That keeps the session cookie first-party, which is
- * what makes auth work when the CRM and API sit on unrelated hosts.
- *
- * Set NEXT_PUBLIC_API_URL only to bypass the proxy and call the API directly —
- * which requires the two to be same-site, or auth will fail.
- */
-const BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     message: string,
-    /** Laravel validation errors, keyed by field. */
+    /** Validation errors, keyed by field. */
     readonly errors: Record<string, string[]> = {},
   ) {
     super(message);
@@ -45,31 +30,15 @@ export class ApiError extends Error {
   }
 }
 
-function readCookie(name: string): string | undefined {
-  if (typeof document === "undefined") return undefined;
-  const match = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith(`${name}=`));
-  return match ? decodeURIComponent(match.slice(name.length + 1)) : undefined;
-}
-
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const method = (init.method ?? "GET").toUpperCase();
-
-  // Laravel rejects state-changing requests without a matching XSRF header.
-  if (method !== "GET" && method !== "HEAD") {
-    await ensureCsrfCookie();
-  }
-
-  const xsrf = readCookie("XSRF-TOKEN");
-
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await fetch(path, {
     ...init,
-    credentials: "include",
+    // Same-origin, so the cookie rides along; stated explicitly so a future
+    // move to a different host fails loudly rather than silently anonymously.
+    credentials: "same-origin",
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      ...(xsrf ? { "X-XSRF-TOKEN": xsrf } : {}),
       ...init.headers,
     },
   });
@@ -89,22 +58,6 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   return body as T;
-}
-
-let csrfPromise: Promise<void> | null = null;
-
-/** Fetched once per page load; concurrent callers share the same request. */
-export function ensureCsrfCookie(): Promise<void> {
-  csrfPromise ??= fetch(`${BASE_URL}/sanctum/csrf-cookie`, {
-    credentials: "include",
-  })
-    .then(() => undefined)
-    .catch((error) => {
-      csrfPromise = null; // let a later call retry
-      throw error;
-    });
-
-  return csrfPromise;
 }
 
 export type AuthUser = {
@@ -148,7 +101,6 @@ export type LeadRecord = {
   isConverted: boolean;
   contactId: string | null;
   dealId: string | null;
-  value: number;
   owner: { id: number; name: string } | null;
   receivedLabel: string;
   createdAt: string;

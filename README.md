@@ -1,18 +1,19 @@
 # ManagerOX CRM
 
-The CRM application, intended for **app.managerox.com**. Next.js (App Router) +
+One Next.js app: the screens, the API and the database schema all live here.
 Tailwind CSS v4, sharing a brand palette with the marketing site
 ([managerox-web](https://github.com/SaadAhmad915/managerox-web)).
 
 ```bash
 npm install
-npm run dev     # http://localhost:3000
-npm run build
-npm start
-npm run lint
+npm run db:seed   # optional, but the app is dull empty
+npm run dev       # http://localhost:3000
 ```
 
-Requires **Node >= 20.9** (Next 16's floor).
+Sign in with **saad@managerox.com** / **password**.
+
+Requires **Node >= 20.9** (Next 16's floor). Other scripts: `npm run build`,
+`npm start`, `npm run lint`, `npm test`, `npm run db:generate`.
 
 This project uses **npm**. It briefly used pnpm, but pnpm's Windows install path
 runs into enough friction (PowerShell execution policy, corepack needing
@@ -21,33 +22,30 @@ own install scripts) that npm is the better default for a mixed-OS team. If you
 switch back, delete `package-lock.json` in the same commit — never commit two
 lockfiles, or local installs and CI can silently resolve different trees.
 
+## No database to install
+
+With no `DATABASE_URL` set, the app runs **PGlite**: real PostgreSQL 18 compiled
+to WebAssembly, kept in a `.pglite` folder. Nothing to install, no container, no
+account. Set `DATABASE_URL` and the identical schema and migrations run against a
+hosted Postgres instead, which is what production uses — so there is no "works
+locally, breaks deployed" gap between them.
+
+Migrations apply themselves on the first connection. `npm run db:generate` turns
+a change in `db/schema.ts` into SQL under `db/migrations`; commit that SQL.
+
+**One process at a time.** PGlite is a single-writer embedded database, so stop
+`npm run dev` before running `npm run db:seed`. Two processes on one `.pglite`
+folder will hang, and can leave it inconsistent.
+
 ## Status
 
-**Milestone 2 — wired to the API.** Sign-in, session handling and a live
-dashboard fed by [managerox-api](https://github.com/SaadAhmad915/managerox-api).
-The other eight sidebar destinations are real routes rendering a placeholder.
-
-**The API must be running** (`php artisan serve` on port 8000) or sign-in fails.
-Copy `.env.example` to `.env.local`; it sets `API_ORIGIN`.
-
-### The API is proxied, not called directly
-
-`next.config.ts` rewrites `/api/*` and `/sanctum/*` to the Laravel API, so the
-browser only ever talks to this app's own origin.
-
-That is not a convenience — it is what makes auth work. The session cookie is
-same-site only, so if the browser called the API directly on an unrelated host
-(`*.vercel.app` vs some API host) the cookie would never be sent and every
-request would 401 with nothing obviously wrong. Proxying keeps the cookie
-first-party and removes CORS from the picture entirely.
-
-`API_ORIGIN` has no `NEXT_PUBLIC_` prefix on purpose: the browser never learns
-the API's real address.
+Sign-in, sessions, dashboard, and full CRUD for leads, contacts, deals and tasks.
+Four sidebar destinations are real routes rendering a placeholder.
 
 | Route | State |
 | --- | --- |
 | `/login` | Sign in — the only route reachable signed out |
-| `/` | Dashboard — live data from `GET /api/dashboard` |
+| `/` | Dashboard — stats, funnel, revenue, tasks, recent leads, team |
 | `/leads` | Enquiries — search, status filter, CRUD, **convert** |
 | `/contacts` | People — search, CRUD, open deals and won value per person |
 | `/deals` | Pipeline — stage filter, lost handling, CRUD, value summary |
@@ -55,55 +53,78 @@ the API's real address.
 | `/calendar` `/reports` `/automation` `/settings` | Placeholder |
 | `/more` | Placeholder — phone tab bar overflow |
 
-### The data model
+## The data model
 
 ```
 Lead ──convert──► Contact ──has many──► Deal
 (enquiry)         (person)              (opportunity: stage + value)
 ```
 
-A lead is an enquiry with a status. Converting it creates the person and their
-first deal, **once** — a second attempt is refused rather than duplicating both.
+A lead is an enquiry with a status and nothing else — **no stage, no value**.
+Those belong to the deal, because a person outlives any single opportunity and
+may hold several. Converting a lead creates the person and their first deal in
+one transaction, **once**; a second attempt is refused rather than quietly
+duplicating both.
 
-`useResourceList` holds the list behaviour every screen needs (debounced search,
-paging, refetch after writes, derived loading) and `ResourceShell` the shared
-chrome, so a new module is mostly its table and its dialog.
+## How a request flows
+
+```
+app/(app)/leads/page.tsx     screen
+  └─ app/lib/api.ts          the only file that talks to the API
+      └─ app/api/leads/…     route handler: auth, validation, query
+          └─ db/schema.ts    Drizzle schema → Postgres
+```
+
+Every request is **same-origin**, so the session cookie is first-party. That
+removes the whole class of silent 401s you get when a cookie is quietly not sent
+to a different site — which is what the previous split-host setup kept hitting.
+
+Sessions are rows in the database, not signed tokens, so signing out revokes
+access immediately rather than leaving a token valid until it expires.
+
+Passwords use Node's built-in `scrypt`. That is deliberate: bcrypt and argon2
+compile native code, which is the most common reason `npm install` fails on a
+Windows machine without build tools.
 
 ## Layout
 
 | Path | What's in it |
 | --- | --- |
-| `app/layout.tsx` | Shell — sidebar, topbar, phone tab bar |
-| `app/page.tsx` | Dashboard |
+| `db/schema.ts` | Tables, relations and the stage/status vocabularies |
+| `db/index.ts` | Driver selection (PGlite or hosted Postgres) + migrations |
+| `db/seed.ts` | Demo data — six months of revenue, a funnel that narrows |
+| `app/api/` | Route handlers, one folder per resource |
+| `app/lib/api.ts` | **The only place the browser talks to the backend** |
+| `app/lib/present.ts` | Rows → the JSON the screens read |
+| `app/lib/convert.ts` | Lead → Contact + Deal, in one transaction |
+| `app/lib/deal-stage.ts` | Keeps `closedAt`/`lostAt` honest against the stage |
 | `app/components/` | One component per card, plus `Icon` and nav chrome |
-| `app/lib/api.ts` | **The only place that talks to the backend** |
-| `app/lib/types.ts` | Domain types |
-| `app/lib/nav.ts` | Sidebar and tab-bar configuration |
 | `app/globals.css` | Design tokens — brand palette and the pipeline ramp |
 
-## Connecting the Laravel API
+`useResourceList` holds the list behaviour every screen needs (debounced search,
+paging, refetch after writes, derived loading) and `ResourceShell` the shared
+chrome, so a new module is mostly its table and its dialog.
 
-`app/lib/api.ts` is the single seam — the only file that knows a URL. Auth state
-lives in `app/lib/auth.tsx`; the `(app)` route group's layout redirects anyone
-without a session to `/login`.
+## Deploying
 
-Three things matter, and breaking any of them gives a silent 401 rather than an
-obvious error:
+Vercel, plus any hosted Postgres (Neon, Supabase, Vercel Postgres). Set
+`DATABASE_URL` and that is the whole configuration — migrations run on the first
+request. Seed a production database by pointing `DATABASE_URL` at it locally and
+running `npm run db:seed`, but note it **clears the CRM tables first**.
 
-- `app.` and `api.` are different origins but the **same site**, so a session
-  cookie with `Domain=.managerox.com` and `SameSite=Lax` is sent on these
-  requests. `SameSite=None` is not needed.
-- Laravel needs CORS with an **explicit** origin (`https://app.managerox.com`,
-  never `*`) and `supports_credentials => true`.
-- Requests must send `credentials: "include"`.
+## Two things that are deliberate, not decorative
 
-## Chart colours are validated, not decorative
+**Chart colours are validated.** The pipeline ramp (`--color-stage-*` in
+`globals.css`) encodes an **ordinal** sequence — stages are ordered positions, so
+they take one hue stepped by lightness rather than a rainbow. The values pass a
+colour validator on monotone lightness, adjacent step separation, light-end
+contrast, and hue spread. The original mockup used five unrelated hues; two
+adjacent stages there sat at ΔE 8.6 for normal vision (floor is 15), meaning
+*Negotiation* and *Closed* were near-indistinguishable. **Re-run a validator
+before substituting colours here.**
 
-The pipeline ramp (`--color-stage-*` in `globals.css`) encodes an **ordinal**
-sequence — stages are ordered positions, so they take one hue stepped by
-lightness rather than a rainbow. The values pass a colour validator on monotone
-lightness, adjacent step separation, light-end contrast, and hue spread.
-
-The original mockup used five unrelated hues; two adjacent stages there sat at
-ΔE 8.6 for normal vision (floor is 15), meaning *Negotiation* and *Closed* were
-near-indistinguishable. **Re-run a validator before substituting colours here.**
+**The funnel's Closed band counts this month only.** Every other band counts
+deals sitting in that stage right now. Counting closed deals for all time would
+compare a growing archive against a live pipeline: after a year the Closed band
+dwarfs every other stage and the funnel is upside down permanently, which says
+nothing about how business is actually flowing.
