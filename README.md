@@ -39,11 +39,33 @@ one `.pglite` folder can leave it inconsistent.
 
 ## When something will not load
 
-The dev server prints **Ready** before it has touched the database — the
-connection opens on the *first request*. So "server looks fine, page never
-loads" is usually the database, not the server.
+**Start here, with the dev server stopped:**
 
-Two things tell you which:
+```bash
+npm run doctor
+```
+
+It checks Node, dependencies, the port, how `localhost` resolves, and whether
+the database opens and holds any accounts — then prints the command that fixes
+whatever is wrong. No browser involved, which matters when the browser is the
+thing misbehaving.
+
+Three causes account for almost everything:
+
+- **The port.** Next moves to **3001** without complaining when 3000 is taken,
+  so you can sit looking at a stale server on 3000 serving an older build. Open
+  the URL Next actually printed.
+- **`localhost` vs `127.0.0.1`.** On Windows `localhost` can resolve to IPv6
+  `::1` while the dev server listens on IPv4, and the request then hangs with no
+  error at either end. **Try `http://127.0.0.1:3000`.**
+- **The database.** The dev server prints "Ready" before it has touched it — the
+  connection opens on the *first request* — so a database that never opens looks
+  like a healthy server and a page that spins.
+
+If the page still only spins, `npm run dev:webpack` runs the dev server on
+webpack instead of Turbopack, which rules out the bundler.
+
+Two things tell you what the database is doing:
 
 - The terminal logs `[db] opening …` and then either `[db] ready in <n>ms` or a
   failure with what to do about it. If you never see `[db] opening`, nothing has
