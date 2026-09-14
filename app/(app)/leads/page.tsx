@@ -29,6 +29,7 @@ function formatValue(value: number) {
 
 export default function LeadsPage() {
   const [stage, setStage] = useState("");
+  const [source, setSource] = useState("");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -41,7 +42,7 @@ export default function LeadsPage() {
    * data was loaded for against the key we currently want says the same thing
    * for free.
    */
-  const requestKey = `${stage}|${debouncedSearch}|${page}|${refreshKey}`;
+  const requestKey = `${stage}|${source}|${debouncedSearch}|${page}|${refreshKey}`;
   const [loaded, setLoaded] = useState<{
     key: string;
     data: Paginated<LeadRecord>;
@@ -68,7 +69,12 @@ export default function LeadsPage() {
   useEffect(() => {
     let active = true;
 
-    getLeads({ stage: stage || undefined, search: debouncedSearch, page })
+    getLeads({
+      stage: stage || undefined,
+      source: source || undefined,
+      search: debouncedSearch,
+      page,
+    })
       .then((data) => {
         if (!active) return;
         setLoaded({ key: requestKey, data });
@@ -81,7 +87,7 @@ export default function LeadsPage() {
     return () => {
       active = false;
     };
-  }, [requestKey, stage, debouncedSearch, page]);
+  }, [requestKey, stage, source, debouncedSearch, page]);
 
   async function confirmDelete() {
     if (!deleting) return;
@@ -156,6 +162,19 @@ export default function LeadsPage() {
             </option>
           ))}
         </select>
+        <select
+          value={source}
+          onChange={(e) => {
+            setSource(e.target.value);
+            setPage(1);
+          }}
+          aria-label="Filter by source"
+          className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 outline-none focus-visible:border-blue-600"
+        >
+          <option value="">All sources</option>
+          <option value="meta">Meta Lead Ads</option>
+          <option value="manual">Added manually</option>
+        </select>
       </div>
 
       {error ? (
@@ -189,8 +208,11 @@ export default function LeadsPage() {
                         {lead.initials}
                       </span>
                       <span className="min-w-0">
-                        <span className="block truncate text-[13.5px] font-extrabold text-slate-900">
-                          {lead.name}
+                        <span className="flex items-center gap-1.5">
+                          <span className="truncate text-[13.5px] font-extrabold text-slate-900">
+                            {lead.name}
+                          </span>
+                          <SourceBadge source={lead.source} />
                         </span>
                         <span className="block truncate text-[12.5px] text-slate-500">
                           {lead.detail || "—"}
@@ -236,8 +258,11 @@ export default function LeadsPage() {
                   {lead.initials}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[13.5px] font-extrabold text-slate-900">
-                    {lead.name}
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate text-[13.5px] font-extrabold text-slate-900">
+                      {lead.name}
+                    </span>
+                    <SourceBadge source={lead.source} />
                   </span>
                   <span className="mt-0.5 flex items-center gap-1.5 text-[12.5px] text-slate-500">
                     <span
@@ -347,6 +372,17 @@ export default function LeadsPage() {
         </Dialog>
       )}
     </div>
+  );
+}
+
+/** Marks leads that arrived from an integration rather than being typed in. */
+function SourceBadge({ source }: { source: string }) {
+  if (source !== "meta") return null;
+
+  return (
+    <span className="shrink-0 rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-extrabold tracking-[0.3px] text-blue-700 uppercase">
+      Meta
+    </span>
   );
 }
 

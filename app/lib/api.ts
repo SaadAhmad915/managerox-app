@@ -138,6 +138,7 @@ export type LeadRecord = {
   detail: string;
   stage: string;
   stageLabel: string;
+  source: string;
   value: number;
   owner: { id: number; name: string } | null;
   receivedLabel: string;
@@ -193,11 +194,17 @@ export function deleteLead(id: string): Promise<void> {
 }
 
 export function getLeads(
-  params: { stage?: string; search?: string; page?: number } = {},
+  params: {
+    stage?: string;
+    search?: string;
+    source?: string;
+    page?: number;
+  } = {},
 ): Promise<Paginated<LeadRecord>> {
   const query = new URLSearchParams();
   if (params.stage) query.set("stage", params.stage);
   if (params.search) query.set("search", params.search);
+  if (params.source) query.set("source", params.source);
   if (params.page) query.set("page", String(params.page));
   const suffix = query.toString() ? `?${query}` : "";
 
