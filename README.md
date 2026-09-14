@@ -48,14 +48,26 @@ the API's real address.
 | --- | --- |
 | `/login` | Sign in — the only route reachable signed out |
 | `/` | Dashboard — live data from `GET /api/dashboard` |
-| `/leads` | Table with search, stage filter, pagination, create / edit / delete |
-| `/contacts` `/deals` `/tasks` | Placeholder |
+| `/leads` | Enquiries — search, status filter, CRUD, **convert** |
+| `/contacts` | People — search, CRUD, open deals and won value per person |
+| `/deals` | Pipeline — stage filter, lost handling, CRUD, value summary |
+| `/tasks` | Follow-ups — open/today/overdue/done, complete inline, CRUD |
 | `/calendar` `/reports` `/automation` `/settings` | Placeholder |
 | `/more` | Placeholder — phone tab bar overflow |
 
-Leads is the reference implementation for a resource screen — list, filter,
-paginate, and the three write operations against the API. Other modules should
-follow its shape.
+### The data model
+
+```
+Lead ──convert──► Contact ──has many──► Deal
+(enquiry)         (person)              (opportunity: stage + value)
+```
+
+A lead is an enquiry with a status. Converting it creates the person and their
+first deal, **once** — a second attempt is refused rather than duplicating both.
+
+`useResourceList` holds the list behaviour every screen needs (debounced search,
+paging, refetch after writes, derived loading) and `ResourceShell` the shared
+chrome, so a new module is mostly its table and its dialog.
 
 ## Layout
 

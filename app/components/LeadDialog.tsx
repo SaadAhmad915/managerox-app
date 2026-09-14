@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { Dialog } from "@/app/components/Dialog";
 import {
   ApiError,
-  LEAD_STAGES,
+  LEAD_STATUSES,
   createLead,
   updateLead,
   type LeadRecord,
@@ -29,8 +29,7 @@ export function LeadDialog({
     email: lead?.email ?? "",
     phone: lead?.phone ?? "",
     detail: lead?.detail ?? "",
-    stage: lead?.stage ?? "new",
-    value: lead ? String(lead.value) : "0",
+    status: lead?.status ?? "new",
   });
   const [error, setError] = useState<ApiError | Error | null>(null);
   const [saving, setSaving] = useState(false);
@@ -51,8 +50,7 @@ export function LeadDialog({
       email: form.email.trim() || null,
       phone: form.phone.trim() || null,
       detail: form.detail.trim() || null,
-      stage: form.stage,
-      value: Number(form.value) || 0,
+      status: form.status,
     };
 
     try {
@@ -144,40 +142,25 @@ export function LeadDialog({
           </label>
         </div>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className={label}>Stage</span>
-            <select
-              name="stage"
-              value={form.stage}
-              onChange={(e) => set("stage")(e.target.value)}
-              className={field}
-            >
-              {LEAD_STAGES.map((stage) => (
-                <option key={stage.value} value={stage.value}>
-                  {stage.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <span className={label}>Value (PKR)</span>
-            <input
-              name="value"
-              type="number"
-              min={0}
-              value={form.value}
-              onChange={(e) => set("value")(e.target.value)}
-              className={field}
-            />
-            {fieldError("value") && (
-              <span className="mt-1 block text-[12px] font-semibold text-red-600">
-                {fieldError("value")}
-              </span>
-            )}
-          </label>
-        </div>
+        <label className="mt-4 block">
+          <span className={label}>Status</span>
+          <select
+            name="status"
+            value={form.status}
+            onChange={(e) => set("status")(e.target.value)}
+            className={field}
+          >
+            {LEAD_STATUSES.map((status) => (
+              <option key={status.value} value={status.value}>
+                {status.label}
+              </option>
+            ))}
+          </select>
+          <span className="mt-1 block text-[12px] text-slate-500">
+            Value and pipeline stage live on the deal, created when this lead is
+            converted.
+          </span>
+        </label>
 
         <div className="mt-6 flex gap-3">
           <button

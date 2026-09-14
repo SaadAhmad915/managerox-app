@@ -142,9 +142,12 @@ export type LeadRecord = {
   email: string | null;
   phone: string | null;
   detail: string;
-  stage: string;
-  stageLabel: string;
+  status: string;
+  statusLabel: string;
   source: string;
+  isConverted: boolean;
+  contactId: string | null;
+  dealId: string | null;
   value: number;
   owner: { id: number; name: string } | null;
   receivedLabel: string;
@@ -161,7 +164,16 @@ export type Paginated<T> = {
  * fetched because five constants are not worth a round trip — but if the API's
  * list changes, this must change with it.
  */
-export const LEAD_STAGES = [
+export const LEAD_STATUSES = [
+  { value: "new", label: "New" },
+  { value: "contacted", label: "Contacted" },
+  { value: "qualified", label: "Qualified" },
+  { value: "unqualified", label: "Unqualified" },
+  { value: "converted", label: "Converted" },
+] as const;
+
+/** Deal pipeline stages, mirroring Deal::STAGES in the API. */
+export const DEAL_STAGES = [
   { value: "new", label: "New Leads" },
   { value: "qualified", label: "Qualified" },
   { value: "proposal", label: "Proposal" },
@@ -174,8 +186,7 @@ export type LeadInput = {
   email?: string | null;
   phone?: string | null;
   detail?: string | null;
-  stage?: string;
-  value?: number;
+  status?: string;
 };
 
 export function createLead(input: LeadInput): Promise<LeadRecord> {
@@ -201,18 +212,182 @@ export function deleteLead(id: string): Promise<void> {
 
 export function getLeads(
   params: {
-    stage?: string;
+    status?: string;
     search?: string;
     source?: string;
     page?: number;
   } = {},
 ): Promise<Paginated<LeadRecord>> {
   const query = new URLSearchParams();
-  if (params.stage) query.set("stage", params.stage);
+  if (params.status) query.set("status", params.status);
   if (params.search) query.set("search", params.search);
   if (params.source) query.set("source", params.source);
   if (params.page) query.set("page", String(params.page));
   const suffix = query.toString() ? `?${query}` : "";
 
   return request<Paginated<LeadRecord>>(`/api/leads${suffix}`);
+}
+
+export function convertLead(
+  id: string,
+  input: { title?: string; value?: number } = {},
+): Promise<{ lead: LeadRecord; contactId: string; dealId: string }> {
+  return request(`/api/leads/${id}/convert`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+// --- contacts ---------------------------------------------------------------
+
+export type ContactRecord = {
+  id: string;
+  name: string;
+  initials: string;
+  email: string | null;
+  phone: string | null;
+  company: string | null;
+  notes: string | null;
+  owner: { id: number; name: string } | null;
+  openDeals: number;
+  wonValue: number;
+  addedLabel: string;
+  createdAt: string;
+};
+
+export type ContactInput = {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  company?: string | null;
+  notes?: string | null;
+};
+
+export function getContacts(
+  params: { search?: string; page?: number } = {},
+): Promise<Paginated<ContactRecord>> {
+  const query = new URLSearchParams();
+  if (params.search) query.set("search", params.search);
+  if (params.page) query.set("page", String(params.page));
+  const suffix = query.toString() ? `?${query}` : "";
+
+  return request<Paginated<ContactRecord>>(`/api/contacts${suffix}`);
+}
+
+export function createContact(input: ContactInput): Promise<ContactRecord> {
+  return request("/api/contacts", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function updateContact(
+  id: string,
+  input: Partial<ContactInput>,
+): Promise<ContactRecord> {
+  return request(`/api/contacts/${id}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export function deleteContact(id: string): Promise<void> {
+  return request(`/api/contacts/${id}`, { method: "DELETE" });
+}
+
+// --- deals ------------------------------------------------------------------
+
+export type DealRecord = {
+  id: string;
+  title: string;
+  stage: string;
+  stageLabel: string;
+  value: number;
+  contact: { id: number; name: string } | null;
+  owner: { id: number; name: string } | null;
+  isWon: boolean;
+  isLost: boolean;
+  expectedCloseOn: string | null;
+  addedLabel: string;
+  createdAt: string;
+};
+
+export type DealInput = {
+  title: string;
+  contact_id?: string | null;
+  stage?: string;
+  value?: number;
+  expected_close_on?: string | null;
+  lost?: boolean;
+};
+
+export type DealList = Paginated<DealRecord> & {
+  summary: { openValue: number; wonValueThisMonth: number };
+};
+
+export function getDeals(
+  params: { stage?: string; search?: string; includeLost?: boolean; page?: number } = {},
+): Promise<DealList> {
+  const query = new URLSearchParams();
+  if (params.stage) query.set("stage", params.stage);
+  if (params.search) query.set("search", params.search);
+  if (params.includeLost) query.set("includeLost", "1");
+  if (params.page) query.set("page", String(params.page));
+  const suffix = query.toString() ? `?${query}` : "";
+
+  return request<DealList>(`/api/deals${suffix}`);
+}
+
+export function createDeal(input: DealInput): Promise<DealRecord> {
+  return request("/api/deals", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function updateDeal(id: string, input: Partial<DealInput>): Promise<DealRecord> {
+  return request(`/api/deals/${id}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export function deleteDeal(id: string): Promise<void> {
+  return request(`/api/deals/${id}`, { method: "DELETE" });
+}
+
+// --- tasks ------------------------------------------------------------------
+
+export type TaskRecord = {
+  id: string;
+  title: string;
+  dueAt: string;
+  dueLabel: string;
+  done: boolean;
+  isOverdue: boolean;
+  priority: "urgent" | "normal";
+  contact: { id: number; name: string } | null;
+  deal: { id: number; title: string } | null;
+};
+
+export type TaskList = Paginated<TaskRecord> & {
+  counts: { open: number; overdue: number; today: number };
+};
+
+export function getTasks(
+  params: { filter?: string; page?: number } = {},
+): Promise<TaskList> {
+  const query = new URLSearchParams();
+  if (params.filter) query.set("filter", params.filter);
+  if (params.page) query.set("page", String(params.page));
+  const suffix = query.toString() ? `?${query}` : "";
+
+  return request<TaskList>(`/api/tasks${suffix}`);
+}
+
+export function createTask(input: {
+  title: string;
+  due_at: string;
+  contact_id?: string | null;
+}): Promise<TaskRecord> {
+  return request("/api/tasks", { method: "POST", body: JSON.stringify(input) });
+}
+
+export function updateTask(
+  id: string,
+  input: { title?: string; due_at?: string; done?: boolean },
+): Promise<TaskRecord> {
+  return request(`/api/tasks/${id}`, { method: "PATCH", body: JSON.stringify(input) });
+}
+
+export function deleteTask(id: string): Promise<void> {
+  return request(`/api/tasks/${id}`, { method: "DELETE" });
 }

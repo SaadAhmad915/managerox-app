@@ -5,20 +5,26 @@ import { Icon } from "@/app/components/Icon";
 import { Dialog } from "@/app/components/Dialog";
 import { LeadDialog } from "@/app/components/LeadDialog";
 import {
-  LEAD_STAGES,
+  ApiError,
+  LEAD_STATUSES,
+  convertLead,
   deleteLead,
   getLeads,
   type LeadRecord,
   type Paginated,
 } from "@/app/lib/api";
 
-/** Same ordinal ramp as the pipeline funnel, so a stage reads alike everywhere. */
-const STAGE_DOT: Record<string, string> = {
+/**
+ * Lead statuses are ordinal too — an enquiry moves along them — so they take
+ * the same single-hue ramp the deal funnel uses. Unqualified sits outside the
+ * progression, so it gets a neutral grey rather than a point on the scale.
+ */
+const STATUS_DOT: Record<string, string> = {
   new: "bg-stage-1",
-  qualified: "bg-stage-2",
-  proposal: "bg-stage-3",
-  negotiation: "bg-stage-4",
-  closed: "bg-stage-5",
+  contacted: "bg-stage-2",
+  qualified: "bg-stage-3",
+  converted: "bg-stage-5",
+  unqualified: "bg-slate-300",
 };
 
 function formatValue(value: number) {
@@ -28,7 +34,7 @@ function formatValue(value: number) {
 }
 
 export default function LeadsPage() {
-  const [stage, setStage] = useState("");
+  const [status, setStatus] = useState("");
   const [source, setSource] = useState("");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -42,7 +48,7 @@ export default function LeadsPage() {
    * data was loaded for against the key we currently want says the same thing
    * for free.
    */
-  const requestKey = `${stage}|${source}|${debouncedSearch}|${page}|${refreshKey}`;
+  const requestKey = `${status}|${source}|${debouncedSearch}|${page}|${refreshKey}`;
   const [loaded, setLoaded] = useState<{
     key: string;
     data: Paginated<LeadRecord>;
@@ -54,6 +60,7 @@ export default function LeadsPage() {
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<LeadRecord | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [converting, setConverting] = useState<LeadRecord | null>(null);
 
   // Typing shouldn't fire a request per keystroke.
   useEffect(() => {
@@ -70,7 +77,7 @@ export default function LeadsPage() {
     let active = true;
 
     getLeads({
-      stage: stage || undefined,
+      status: status || undefined,
       source: source || undefined,
       search: debouncedSearch,
       page,
@@ -87,7 +94,7 @@ export default function LeadsPage() {
     return () => {
       active = false;
     };
-  }, [requestKey, stage, source, debouncedSearch, page]);
+  }, [requestKey, status, source, debouncedSearch, page]);
 
   async function confirmDelete() {
     if (!deleting) return;
@@ -147,16 +154,16 @@ export default function LeadsPage() {
           />
         </label>
         <select
-          value={stage}
+          value={status}
           onChange={(e) => {
-            setStage(e.target.value);
+            setStatus(e.target.value);
             setPage(1);
           }}
-          aria-label="Filter by stage"
+          aria-label="Filter by status"
           className="rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 outline-none focus-visible:border-blue-600"
         >
-          <option value="">All stages</option>
-          {LEAD_STAGES.map((s) => (
+          <option value="">All statuses</option>
+          {LEAD_STATUSES.map((s) => (
             <option key={s.value} value={s.value}>
               {s.label}
             </option>
@@ -223,9 +230,9 @@ export default function LeadsPage() {
                   <td className="px-5 py-3">
                     <span className="flex items-center gap-2 text-[13px] whitespace-nowrap text-slate-700">
                       <span
-                        className={`size-2.5 shrink-0 rounded-full ${STAGE_DOT[lead.stage] ?? "bg-slate-300"}`}
+                        className={`size-2.5 shrink-0 rounded-full ${STATUS_DOT[lead.status] ?? "bg-slate-300"}`}
                       />
-                      {lead.stageLabel}
+                      {lead.statusLabel}
                     </span>
                   </td>
                   <td className="tnum px-5 py-3 text-right text-[13.5px] font-bold text-slate-900">
@@ -238,6 +245,8 @@ export default function LeadsPage() {
                     <div className="flex justify-end gap-1">
                       <RowActions
                         name={lead.name}
+                        converted={lead.isConverted}
+                        onConvert={() => setConverting(lead)}
                         onEdit={() => setEditing(lead)}
                         onDelete={() => setDeleting(lead)}
                       />
@@ -266,14 +275,16 @@ export default function LeadsPage() {
                   </span>
                   <span className="mt-0.5 flex items-center gap-1.5 text-[12.5px] text-slate-500">
                     <span
-                      className={`size-2 shrink-0 rounded-full ${STAGE_DOT[lead.stage] ?? "bg-slate-300"}`}
+                      className={`size-2 shrink-0 rounded-full ${STATUS_DOT[lead.status] ?? "bg-slate-300"}`}
                     />
-                    {lead.stageLabel}
+                    {lead.statusLabel}
                     {lead.value > 0 && ` · ${formatValue(lead.value)}`}
                   </span>
                 </span>
                 <RowActions
                   name={lead.name}
+                  converted={lead.isConverted}
+                  onConvert={() => setConverting(lead)}
                   onEdit={() => setEditing(lead)}
                   onDelete={() => setDeleting(lead)}
                 />
@@ -296,7 +307,7 @@ export default function LeadsPage() {
                 No leads match this view
               </p>
               <p className="mt-1 text-[13.5px] text-slate-500">
-                {search || stage
+                {search || status
                   ? "Try clearing the search or stage filter."
                   : "Create your first lead to get started."}
               </p>
@@ -346,6 +357,17 @@ export default function LeadsPage() {
         />
       )}
 
+      {converting && (
+        <ConvertDialog
+          lead={converting}
+          onClose={() => setConverting(null)}
+          onConverted={() => {
+            setConverting(null);
+            reload();
+          }}
+        />
+      )}
+
       {deleting && (
         <Dialog
           title="Delete this lead?"
@@ -388,15 +410,30 @@ function SourceBadge({ source }: { source: string }) {
 
 function RowActions({
   name,
+  converted,
+  onConvert,
   onEdit,
   onDelete,
 }: {
   name: string;
+  converted: boolean;
+  onConvert: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   return (
     <>
+      {!converted && (
+        <button
+          type="button"
+          onClick={onConvert}
+          aria-label={`Convert ${name}`}
+          title="Convert to contact and deal"
+          className="flex size-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
+        >
+          <Icon name="trending_up" size={18} />
+        </button>
+      )}
       <button
         type="button"
         onClick={onEdit}
@@ -414,5 +451,112 @@ function RowActions({
         <Icon name="delete" size={18} />
       </button>
     </>
+  );
+}
+
+
+/**
+ * Converting creates the person and their first opportunity. It happens once —
+ * a second attempt is refused by the API rather than quietly duplicating both.
+ */
+function ConvertDialog({
+  lead,
+  onClose,
+  onConverted,
+}: {
+  lead: LeadRecord;
+  onClose: () => void;
+  onConverted: () => void;
+}) {
+  const [title, setTitle] = useState(lead.detail || lead.name);
+  const [value, setValue] = useState("0");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setError(null);
+    setSaving(true);
+
+    try {
+      await convertLead(lead.id, {
+        title: title.trim() || undefined,
+        value: Number(value) || 0,
+      });
+      onConverted();
+    } catch (caught) {
+      setError(
+        caught instanceof ApiError ? caught.message : "Could not convert this lead.",
+      );
+      setSaving(false);
+    }
+  }
+
+  const inputClass =
+    "mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm outline-none focus-visible:border-blue-600 focus-visible:ring-2 focus-visible:ring-blue-100";
+
+  return (
+    <Dialog
+      title="Convert this lead"
+      description={`Creates a contact for ${lead.name} and their first deal.`}
+      onClose={onClose}
+    >
+      <form onSubmit={handleSubmit} noValidate>
+        {error && (
+          <div
+            role="alert"
+            className="mb-4 rounded-xl bg-red-50 px-3.5 py-3 text-[13px] font-semibold text-red-600"
+          >
+            {error}
+          </div>
+        )}
+
+        <label className="block">
+          <span className="text-[13px] font-bold text-slate-700">Deal title</span>
+          <input
+            name="title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className={inputClass}
+          />
+        </label>
+
+        <label className="mt-4 block">
+          <span className="text-[13px] font-bold text-slate-700">
+            Deal value (PKR)
+          </span>
+          <input
+            name="value"
+            type="number"
+            min={0}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className={inputClass}
+          />
+        </label>
+
+        <p className="mt-3 text-[12px] text-slate-500">
+          The deal starts at the Qualified stage. The lead is kept as the record
+          of where this business came from.
+        </p>
+
+        <div className="mt-6 flex gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition-colors hover:border-slate-300"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex-1 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-blue-700 disabled:opacity-60"
+          >
+            {saving ? "Converting…" : "Convert lead"}
+          </button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
