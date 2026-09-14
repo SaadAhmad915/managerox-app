@@ -1,147 +1,162 @@
 import type { DashboardData } from "@/app/lib/types";
 
 /**
- * The single seam between the UI and the backend.
+ * The only place that talks to the Laravel API.
  *
- * Every function here is async and returns domain types, so swapping the mock
- * for the Laravel API on api.managerox.com is a change to this file only — no
- * component touches fetch, URLs, or response shapes.
+ * Auth is Sanctum's SPA cookie mode, so every request must send credentials and
+ * state-changing requests must carry the XSRF header. Three rules follow, and
+ * breaking any of them produces a silent 401 rather than an obvious error:
  *
- * When the API exists, the body becomes roughly:
- *
- *   const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/dashboard`, {
- *     credentials: "include",        // session cookie on .managerox.com
- *     headers: { Accept: "application/json" },
- *   });
- *   if (!res.ok) throw new ApiError(res.status);
- *   return res.json();
- *
- * app. and api. are different origins but the same site, so a Lax cookie
- * scoped to .managerox.com is sent on these requests; Laravel needs CORS with
- * an explicit origin plus supports_credentials.
+ *  1. `credentials: "include"` on every call — without it the browser omits the
+ *     session cookie and the API sees an anonymous request.
+ *  2. `/sanctum/csrf-cookie` must be fetched once before the first POST.
+ *  3. The API's Origin must appear in its SANCTUM_STATEFUL_DOMAINS, or Sanctum
+ *     treats the request as stateless and never attaches a session at all.
  */
 
-const MOCK_DASHBOARD: DashboardData = {
-  user: { firstName: "Ali", fullName: "Ali Khan", role: "Sales Manager" },
-  stats: [
-    {
-      key: "leads",
-      label: "Total Leads",
-      display: "1,250",
-      value: 1250,
-      trend: { changePct: 12, comparisonLabel: "vs last month" },
+const BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
+).replace(/\/$/, "");
+
+export class ApiError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+    /** Laravel validation errors, keyed by field. */
+    readonly errors: Record<string, string[]> = {},
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+
+  get isUnauthenticated() {
+    return this.status === 401 || this.status === 419;
+  }
+
+  /** First validation message for a field, if the API returned one. */
+  fieldError(field: string): string | undefined {
+    return this.errors[field]?.[0];
+  }
+}
+
+function readCookie(name: string): string | undefined {
+  if (typeof document === "undefined") return undefined;
+  const match = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith(`${name}=`));
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : undefined;
+}
+
+async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const method = (init.method ?? "GET").toUpperCase();
+
+  // Laravel rejects state-changing requests without a matching XSRF header.
+  if (method !== "GET" && method !== "HEAD") {
+    await ensureCsrfCookie();
+  }
+
+  const xsrf = readCookie("XSRF-TOKEN");
+
+  const response = await fetch(`${BASE_URL}${path}`, {
+    ...init,
+    credentials: "include",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      ...(xsrf ? { "X-XSRF-TOKEN": xsrf } : {}),
+      ...init.headers,
     },
-    {
-      key: "deals",
-      label: "Active Deals",
-      display: "320",
-      value: 320,
-      trend: { changePct: 8, comparisonLabel: "vs last month" },
-    },
-    {
-      key: "customers",
-      label: "Customers",
-      display: "890",
-      value: 890,
-      trend: { changePct: 15, comparisonLabel: "vs last month" },
-    },
-    {
-      key: "revenue",
-      label: "Revenue (PKR)",
-      display: "52M",
-      value: 52_000_000,
-      trend: { changePct: 20, comparisonLabel: "vs last month" },
-    },
-  ],
-  pipeline: [
-    { id: "new", label: "New Leads", count: 1250 },
-    { id: "qualified", label: "Qualified", count: 640 },
-    { id: "proposal", label: "Proposal", count: 320 },
-    { id: "negotiation", label: "Negotiation", count: 210 },
-    { id: "closed", label: "Closed", count: 180 },
-  ],
-  revenue: {
-    currency: "PKR",
-    total: 52_000_000,
-    totalDisplay: "PKR 52,000,000",
-    trend: { changePct: 20, comparisonLabel: "vs last month" },
-    points: [
-      { month: "Jan", value: 8_000_000 },
-      { month: "Feb", value: 20_000_000 },
-      { month: "Mar", value: 28_000_000 },
-      { month: "Apr", value: 38_000_000 },
-      { month: "May", value: 45_000_000 },
-      { month: "Jun", value: 52_000_000 },
-    ],
-  },
-  tasks: [
-    {
-      id: "t1",
-      title: "Follow up with Ahmed (Phase 7 Plot)",
-      dueLabel: "Today, 11:00 AM",
-      priority: "urgent",
-      done: false,
-    },
-    {
-      id: "t2",
-      title: "Send proposal to Zameen Group",
-      dueLabel: "Today, 2:00 PM",
-      priority: "urgent",
-      done: false,
-    },
-    {
-      id: "t3",
-      title: "Call new lead from website",
-      dueLabel: "Tomorrow, 10:00 AM",
-      priority: "normal",
-      done: false,
-    },
-    {
-      id: "t4",
-      title: "Prepare weekly sales report",
-      dueLabel: "Tomorrow, 4:00 PM",
-      priority: "normal",
-      done: false,
-    },
-  ],
-  recentLeads: [
-    {
-      id: "l1",
-      name: "Farhan Ali",
-      initials: "FA",
-      detail: "Residential Plot – DHA Lahore",
-      receivedLabel: "10 mins ago",
-    },
-    {
-      id: "l2",
-      name: "Sara Khan",
-      initials: "SK",
-      detail: "Commercial – DHA Karachi",
-      receivedLabel: "1 hour ago",
-    },
-    {
-      id: "l3",
-      name: "Ahmad Malik",
-      initials: "AM",
-      detail: "Villa – DHA Islamabad",
-      receivedLabel: "3 hours ago",
-    },
-    {
-      id: "l4",
-      name: "Nida Zahra",
-      initials: "NZ",
-      detail: "Apartment – DHA Multan",
-      receivedLabel: "5 hours ago",
-    },
-  ],
-  team: [
-    { id: "u1", name: "Ali Khan", role: "Sales Manager", attainment: 92 },
-    { id: "u2", name: "Sara Ahmed", role: "Sales Executive", attainment: 78 },
-    { id: "u3", name: "Bilal Raza", role: "Sales Executive", attainment: 65 },
-    { id: "u4", name: "Ayesha Malik", role: "Sales Executive", attainment: 58 },
-  ],
+  });
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const body = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new ApiError(
+      response.status,
+      body.message ?? `Request failed with ${response.status}`,
+      body.errors ?? {},
+    );
+  }
+
+  return body as T;
+}
+
+let csrfPromise: Promise<void> | null = null;
+
+/** Fetched once per page load; concurrent callers share the same request. */
+export function ensureCsrfCookie(): Promise<void> {
+  csrfPromise ??= fetch(`${BASE_URL}/sanctum/csrf-cookie`, {
+    credentials: "include",
+  })
+    .then(() => undefined)
+    .catch((error) => {
+      csrfPromise = null; // let a later call retry
+      throw error;
+    });
+
+  return csrfPromise;
+}
+
+export type AuthUser = {
+  id: string;
+  firstName: string;
+  fullName: string;
+  email: string;
+  role: string;
+  initials: string;
 };
 
-export async function getDashboard(): Promise<DashboardData> {
-  return MOCK_DASHBOARD;
+export function login(email: string, password: string): Promise<AuthUser> {
+  return request<AuthUser>("/api/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function logout(): Promise<void> {
+  await request<{ message: string }>("/api/logout", { method: "POST" });
+}
+
+export function getMe(): Promise<AuthUser> {
+  return request<AuthUser>("/api/me");
+}
+
+export function getDashboard(): Promise<DashboardData> {
+  return request<DashboardData>("/api/dashboard");
+}
+
+export type LeadRecord = {
+  id: string;
+  name: string;
+  initials: string;
+  email: string | null;
+  phone: string | null;
+  detail: string;
+  stage: string;
+  stageLabel: string;
+  value: number;
+  owner: { id: number; name: string } | null;
+  receivedLabel: string;
+  createdAt: string;
+};
+
+export type Paginated<T> = {
+  data: T[];
+  meta: { page: number; perPage: number; total: number; lastPage: number };
+};
+
+export function getLeads(
+  params: { stage?: string; search?: string; page?: number } = {},
+): Promise<Paginated<LeadRecord>> {
+  const query = new URLSearchParams();
+  if (params.stage) query.set("stage", params.stage);
+  if (params.search) query.set("search", params.search);
+  if (params.page) query.set("page", String(params.page));
+  const suffix = query.toString() ? `?${query}` : "";
+
+  return request<Paginated<LeadRecord>>(`/api/leads${suffix}`);
 }

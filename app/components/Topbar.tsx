@@ -3,18 +3,22 @@
 import { useState } from "react";
 import { Icon } from "@/app/components/Icon";
 import { SidebarNav, UpgradeCard, Wordmark } from "@/app/components/Sidebar";
+import { useAuth } from "@/app/lib/auth";
 
 export function Topbar({
   user,
 }: {
-  user: { fullName: string; role: string };
+  user: { fullName: string; role: string; initials?: string };
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const initials = user.fullName
-    .split(" ")
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2);
+  const { signOut } = useAuth();
+  const initials =
+    user.initials ??
+    user.fullName
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2);
 
   return (
     <>
@@ -63,11 +67,15 @@ export function Topbar({
               {user.role}
             </div>
           </div>
-          <Icon
-            name="keyboard_arrow_down"
-            size={20}
-            className="hidden text-slate-400 sm:block"
-          />
+          <button
+            type="button"
+            onClick={signOut}
+            aria-label="Sign out"
+            title="Sign out"
+            className="flex size-10 items-center justify-center rounded-xl text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          >
+            <Icon name="logout" size={20} />
+          </button>
         </div>
       </header>
 

@@ -23,19 +23,24 @@ lockfiles, or local installs and CI can silently resolve different trees.
 
 ## Status
 
-**Milestone 1 — app shell + dashboard.** The dashboard is complete and built to
-the product design. The other eight sidebar destinations are real routes
-rendering a placeholder, so navigation works end to end.
+**Milestone 2 — wired to the API.** Sign-in, session handling and a live
+dashboard fed by [managerox-api](https://github.com/SaadAhmad915/managerox-api).
+The other eight sidebar destinations are real routes rendering a placeholder.
+
+**The API must be running** (`php artisan serve` on port 8000) or the app shows
+a sign-in failure. Set `NEXT_PUBLIC_API_URL` in `.env.local` — copy
+`.env.example` to start.
 
 | Route | State |
 | --- | --- |
-| `/` | Dashboard — stat tiles, pipeline funnel, revenue chart, tasks, leads, team |
+| `/login` | Sign in — the only route reachable signed out |
+| `/` | Dashboard — live data from `GET /api/dashboard` |
 | `/leads` `/contacts` `/deals` `/tasks` | Placeholder |
 | `/calendar` `/reports` `/automation` `/settings` | Placeholder |
 | `/more` | Placeholder — phone tab bar overflow |
 
-Not built yet: **authentication** (every route is currently public) and any
-write operations.
+Not built yet: write operations from the UI. The API supports leads CRUD; no
+screen uses it yet.
 
 ## Layout
 
@@ -51,11 +56,12 @@ write operations.
 
 ## Connecting the Laravel API
 
-`app/lib/api.ts` is the single seam. Every function is already `async` and
-returns domain types, so swapping mock data for real calls touches that file
-only — no component knows a URL or a response shape.
+`app/lib/api.ts` is the single seam — the only file that knows a URL. Auth state
+lives in `app/lib/auth.tsx`; the `(app)` route group's layout redirects anyone
+without a session to `/login`.
 
-Three things matter when `api.managerox.com` lands:
+Three things matter, and breaking any of them gives a silent 401 rather than an
+obvious error:
 
 - `app.` and `api.` are different origins but the **same site**, so a session
   cookie with `Domain=.managerox.com` and `SameSite=Lax` is sent on these
