@@ -149,6 +149,49 @@ export type Paginated<T> = {
   meta: { page: number; perPage: number; total: number; lastPage: number };
 };
 
+/**
+ * Pipeline stages, mirroring Lead::STAGES in the API. Kept here rather than
+ * fetched because five constants are not worth a round trip — but if the API's
+ * list changes, this must change with it.
+ */
+export const LEAD_STAGES = [
+  { value: "new", label: "New Leads" },
+  { value: "qualified", label: "Qualified" },
+  { value: "proposal", label: "Proposal" },
+  { value: "negotiation", label: "Negotiation" },
+  { value: "closed", label: "Closed" },
+] as const;
+
+export type LeadInput = {
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  detail?: string | null;
+  stage?: string;
+  value?: number;
+};
+
+export function createLead(input: LeadInput): Promise<LeadRecord> {
+  return request<LeadRecord>("/api/leads", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function updateLead(
+  id: string,
+  input: Partial<LeadInput>,
+): Promise<LeadRecord> {
+  return request<LeadRecord>(`/api/leads/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function deleteLead(id: string): Promise<void> {
+  return request<void>(`/api/leads/${id}`, { method: "DELETE" });
+}
+
 export function getLeads(
   params: { stage?: string; search?: string; page?: number } = {},
 ): Promise<Paginated<LeadRecord>> {

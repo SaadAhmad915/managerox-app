@@ -35,12 +35,14 @@ a sign-in failure. Set `NEXT_PUBLIC_API_URL` in `.env.local` — copy
 | --- | --- |
 | `/login` | Sign in — the only route reachable signed out |
 | `/` | Dashboard — live data from `GET /api/dashboard` |
-| `/leads` `/contacts` `/deals` `/tasks` | Placeholder |
+| `/leads` | Table with search, stage filter, pagination, create / edit / delete |
+| `/contacts` `/deals` `/tasks` | Placeholder |
 | `/calendar` `/reports` `/automation` `/settings` | Placeholder |
 | `/more` | Placeholder — phone tab bar overflow |
 
-Not built yet: write operations from the UI. The API supports leads CRUD; no
-screen uses it yet.
+Leads is the reference implementation for a resource screen — list, filter,
+paginate, and the three write operations against the API. Other modules should
+follow its shape.
 
 ## Layout
 
