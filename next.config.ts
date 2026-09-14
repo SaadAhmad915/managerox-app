@@ -31,6 +31,15 @@ const nextConfig: NextConfig = {
    * on the server. It is never reached from the browser.
    */
   serverExternalPackages: ["@electric-sql/pglite"],
+
+  /*
+   * Migrations are read from disk at runtime, and Next only bundles files it
+   * can see being imported. Without this the SQL is missing from the deployed
+   * function and the first request fails on a database with no tables.
+   */
+  outputFileTracingIncludes: {
+    "/**": ["./db/migrations/**"],
+  },
 };
 
 export default nextConfig;

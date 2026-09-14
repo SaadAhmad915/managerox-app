@@ -165,10 +165,28 @@ chrome, so a new module is mostly its table and its dialog.
 
 ## Deploying
 
-Vercel, plus any hosted Postgres (Neon, Supabase, Vercel Postgres). Set
-`DATABASE_URL` and that is the whole configuration — migrations run on the first
-request. Seed a production database by pointing `DATABASE_URL` at it locally and
-running `npm run db:seed`, but note it **clears the CRM tables first**.
+Vercel, plus any hosted Postgres. Two environment variables on the project:
+
+| Variable | Value |
+| --- | --- |
+| `DATABASE_URL` | The connection string from Neon, Supabase or Vercel Postgres |
+| `SEED_ON_EMPTY` | `1`, only until there is real data — then delete it |
+
+**PGlite cannot be used on a deployment.** It writes to a folder on disk, and a
+serverless function has a read-only filesystem and is thrown away between
+requests, so it would either fail outright or appear to work while losing every
+write. The app refuses to start without `DATABASE_URL` in production rather than
+letting that happen quietly.
+
+`SEED_ON_EMPTY` puts the demo data into a brand new database on its first
+request, so a deployment has an account to sign in with without anyone pointing
+a terminal at the production database. It runs only when there is not a single
+account, so it cannot touch a database already in use — but remove it once the
+data is real.
+
+Migrations run on the first request, and `outputFileTracingIncludes` in
+`next.config.ts` ensures the SQL is actually shipped inside the function;
+without it the deployment starts against a database with no tables.
 
 ## Two things that are deliberate, not decorative
 

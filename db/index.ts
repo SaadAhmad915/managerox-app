@@ -1,5 +1,6 @@
 import "server-only";
 
+import { join } from "node:path";
 import * as schema from "@/db/schema";
 
 /**
@@ -22,7 +23,12 @@ import * as schema from "@/db/schema";
 /** Derived from `open`, not `create`: `create` is annotated with this type. */
 export type Database = Awaited<ReturnType<typeof open>>;
 
-const MIGRATIONS = "./db/migrations";
+/**
+ * Absolute, because a serverless function does not necessarily run from the
+ * project root the way `next dev` does, and a relative path would then resolve
+ * to nothing.
+ */
+const MIGRATIONS = join(process.cwd(), "db", "migrations");
 
 /**
  * How long to wait for the database to open before giving up.
@@ -62,6 +68,22 @@ function timeout(): Promise<never> {
 async function open() {
   const url = process.env.DATABASE_URL;
 
+  /*
+   * PGlite keeps its data in a folder on disk. That is ideal on a laptop and
+   * impossible on a serverless host, where the filesystem is read-only and the
+   * container is thrown away between requests — so it would either fail oddly
+   * or appear to work and lose every write. Better to say so plainly than to
+   * let someone deploy a CRM that silently forgets.
+   */
+  if (!url && (process.env.VERCEL || process.env.NODE_ENV === "production")) {
+    throw new Error(
+      "DATABASE_URL is not set. A deployed instance needs a hosted Postgres: " +
+        "the local PGlite database writes to disk, which does not survive (or " +
+        "even work) on a serverless host. Add DATABASE_URL in the project's " +
+        "environment variables and redeploy.",
+    );
+  }
+
   if (url) {
     const { drizzle } = await import("drizzle-orm/node-postgres");
     const { migrate } = await import("drizzle-orm/node-postgres/migrator");
@@ -93,6 +115,26 @@ async function open() {
 }
 
 /**
+ * Puts the demo data into a database that has never been used.
+ *
+ * Opt-in through SEED_ON_EMPTY, and only when there is not a single account —
+ * so it can populate a brand new deployment on its first request, and can never
+ * touch a database that someone is already using. Remove the variable once
+ * there is real data in there.
+ */
+async function seedIfEmpty(db: Database) {
+  if (!process.env.SEED_ON_EMPTY) return;
+
+  const [existing] = await db.select({ id: schema.users.id }).from(schema.users).limit(1);
+  if (existing) return;
+
+  console.log("[db] empty database and SEED_ON_EMPTY is set — seeding…");
+  const { seedDatabase } = await import("@/db/seed-data");
+  const counts = await seedDatabase(db);
+  console.log(`[db] seeded ${counts.users} users and ${counts.deals} deals`);
+}
+
+/**
  * Opens the database, saying so in the terminal.
  *
  * The logging is not noise: this is the one slow, failure-prone step between a
@@ -110,6 +152,7 @@ async function create(): Promise<Database> {
 
   try {
     const db = await Promise.race([open(), timeout()]);
+    await seedIfEmpty(db);
     console.log(`[db] ready in ${Date.now() - started}ms`);
     return db;
   } catch (error) {

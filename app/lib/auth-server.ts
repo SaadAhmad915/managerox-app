@@ -1,47 +1,20 @@
 import "server-only";
 
-import { randomBytes, scrypt, timingSafeEqual } from "node:crypto";
-import { promisify } from "node:util";
+import { randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import { and, eq, gt } from "drizzle-orm";
 import { getDb } from "@/db";
 import { sessions, users } from "@/db/schema";
 
-const scryptAsync = promisify(scrypt);
+/**
+ * Hashing lives in app/lib/password.ts, which imports nothing. The seed needs
+ * to hash a password and this module needs the database, so keeping them
+ * together would make the seed import the database in order to write to it.
+ */
+export { hashPassword, verifyPassword } from "@/app/lib/password";
 
 const SESSION_COOKIE = "managerox_session";
 const SESSION_DAYS = 30;
-
-/**
- * Password hashing with Node's built-in scrypt.
- *
- * Deliberately no bcrypt/argon2 package: those compile native code, which is
- * the single most common reason `npm install` fails on a Windows machine
- * without build tools. scrypt is memory-hard, in the standard library, and
- * needs no toolchain.
- */
-export async function hashPassword(password: string): Promise<string> {
-  const salt = randomBytes(16).toString("hex");
-  const derived = (await scryptAsync(password, salt, 64)) as Buffer;
-  return `${salt}:${derived.toString("hex")}`;
-}
-
-export async function verifyPassword(
-  password: string,
-  stored: string,
-): Promise<boolean> {
-  const [salt, key] = stored.split(":");
-  if (!salt || !key) return false;
-
-  const derived = (await scryptAsync(password, salt, 64)) as Buffer;
-  const expected = Buffer.from(key, "hex");
-
-  // Length check first: timingSafeEqual throws on a mismatch rather than
-  // returning false, and the comparison itself must not leak timing.
-  return (
-    derived.length === expected.length && timingSafeEqual(derived, expected)
-  );
-}
 
 export type SessionUser = {
   id: number;
