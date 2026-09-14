@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { getDb } from "@/db";
+import { databaseUrl, getDb } from "@/db";
 import { users } from "@/db/schema";
 import { json } from "@/app/lib/http";
 
@@ -19,19 +19,21 @@ export async function GET() {
     const [row] = await db.select({ total: sql<number>`count(*)`.mapWith(Number) }).from(users);
 
     return json({
-      database: process.env.DATABASE_URL ? "hosted Postgres" : "PGlite",
+      database: databaseUrl() ? "hosted Postgres" : "PGlite",
       ok: true,
       users: row.total,
       ms: Date.now() - started,
       hint:
-        row.total === 0
-          ? "No accounts yet. Stop the dev server and run: npm run db:seed"
-          : "Ready. Sign in at /login",
+        row.total > 0
+          ? "Ready. Sign in at /login"
+          : databaseUrl()
+            ? "No accounts yet. Set SEED_ON_EMPTY=1 in this project's environment variables and redeploy."
+            : "No accounts yet. Stop the dev server and run: npm run db:seed",
     });
   } catch (error) {
     return json(
       {
-        database: process.env.DATABASE_URL ? "hosted Postgres" : "PGlite",
+        database: databaseUrl() ? "hosted Postgres" : "PGlite",
         ok: false,
         ms: Date.now() - started,
         error: error instanceof Error ? error.message : String(error),

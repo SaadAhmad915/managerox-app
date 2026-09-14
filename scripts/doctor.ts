@@ -2,7 +2,7 @@ import { createServer } from "node:net";
 import { lookup } from "node:dns/promises";
 import { existsSync } from "node:fs";
 import { sql } from "drizzle-orm";
-import { getDb } from "@/db";
+import { databaseUrl, getDb } from "@/db";
 import { users } from "@/db/schema";
 
 /**
@@ -89,9 +89,9 @@ async function main() {
   }
 
   // --- where the data lives -------------------------------------------------
-  if (process.env.DATABASE_URL) {
+  if (databaseUrl()) {
     warn(
-      "DATABASE_URL is set",
+      "A hosted database is configured",
       "The app will use hosted Postgres, not the local .pglite folder. Unset it " +
         "in .env.local to develop locally.",
     );
@@ -122,7 +122,7 @@ async function main() {
     }
   } catch (error) {
     bad(
-      `Database did not open (${process.env.DATABASE_URL ? "hosted Postgres" : path})`,
+      `Database did not open (${databaseUrl() ? "hosted Postgres" : path})`,
       error instanceof Error ? error.message : String(error),
     );
   }

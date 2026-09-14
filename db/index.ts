@@ -49,7 +49,7 @@ function timeout(): Promise<never> {
         reject(
           new Error(
             `The database did not open within ${Math.round(OPEN_TIMEOUT_MS / 1000)}s.\n` +
-              (process.env.DATABASE_URL
+              (databaseUrl()
                 ? "Check DATABASE_URL is reachable from here."
                 : "The usual cause is another process holding the .pglite folder — " +
                   "PGlite allows one writer at a time. Stop any other `npm run dev` " +
@@ -65,8 +65,26 @@ function timeout(): Promise<never> {
   );
 }
 
+/**
+ * The connection string, whatever the host decided to call it.
+ *
+ * Vercel's Postgres integrations set POSTGRES_URL and friends rather than
+ * DATABASE_URL, so insisting on one name means clicking "create database" gets
+ * you a deployment that still cannot find it. The pooled URL comes first: a
+ * serverless function opens a connection per invocation and would otherwise
+ * exhaust the database's connection limit under any real traffic.
+ */
+export function databaseUrl(): string | undefined {
+  return (
+    process.env.DATABASE_URL ??
+    process.env.POSTGRES_URL ??
+    process.env.POSTGRES_PRISMA_URL ??
+    process.env.POSTGRES_URL_NON_POOLING
+  );
+}
+
 async function open() {
-  const url = process.env.DATABASE_URL;
+  const url = databaseUrl();
 
   /*
    * PGlite keeps its data in a folder on disk. That is ideal on a laptop and
@@ -77,10 +95,11 @@ async function open() {
    */
   if (!url && (process.env.VERCEL || process.env.NODE_ENV === "production")) {
     throw new Error(
-      "DATABASE_URL is not set. A deployed instance needs a hosted Postgres: " +
-        "the local PGlite database writes to disk, which does not survive (or " +
-        "even work) on a serverless host. Add DATABASE_URL in the project's " +
-        "environment variables and redeploy.",
+      "No database connection string found. A deployed instance needs a hosted " +
+        "Postgres: the local PGlite database writes to disk, which does not " +
+        "survive (or even work) on a serverless host. Set DATABASE_URL (or " +
+        "POSTGRES_URL, which Vercel's Postgres integrations create for you) in " +
+        "the project's environment variables and redeploy.",
     );
   }
 
@@ -143,7 +162,7 @@ async function seedIfEmpty(db: Database) {
  * see while it works, and nothing to read if it does not.
  */
 async function create(): Promise<Database> {
-  const where = process.env.DATABASE_URL
+  const where = databaseUrl()
     ? "hosted Postgres"
     : `PGlite (${process.env.PGLITE_PATH ?? ".pglite"})`;
   const started = Date.now();
