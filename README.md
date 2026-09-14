@@ -33,9 +33,39 @@ locally, breaks deployed" gap between them.
 Migrations apply themselves on the first connection. `npm run db:generate` turns
 a change in `db/schema.ts` into SQL under `db/migrations`; commit that SQL.
 
-**One process at a time.** PGlite is a single-writer embedded database, so stop
-`npm run dev` before running `npm run db:seed`. Two processes on one `.pglite`
-folder will hang, and can leave it inconsistent.
+**One process at a time.** PGlite is an embedded database meant to have a single
+writer, so stop `npm run dev` before running `npm run db:seed`. Two processes on
+one `.pglite` folder can leave it inconsistent.
+
+## When something will not load
+
+The dev server prints **Ready** before it has touched the database — the
+connection opens on the *first request*. So "server looks fine, page never
+loads" is usually the database, not the server.
+
+Two things tell you which:
+
+- The terminal logs `[db] opening …` and then either `[db] ready in <n>ms` or a
+  failure with what to do about it. If you never see `[db] opening`, nothing has
+  reached a route handler yet — check the port Next actually printed, since it
+  quietly moves to 3001 when 3000 is taken.
+- **`http://localhost:3000/api/health`** answers without signing in, because
+  when things are broken you cannot sign in. It reports whether the database
+  opened, how long it took, and how many accounts exist.
+
+```jsonc
+{ "database": "PGlite", "ok": true, "users": 3, "ms": 497, "hint": "Ready. Sign in at /login" }
+{ "database": "PGlite", "ok": false, "ms": 45001, "error": "The database did not open within 45s. …" }
+```
+
+`users: 0` means the database is fine but empty — stop the dev server and run
+`npm run db:seed`. Opening gives up after 45 seconds rather than hanging forever
+(`DB_TIMEOUT_MS` to change it). In development the real error is sent to the
+browser too; in production it stays generic.
+
+A project folder synced by OneDrive or Dropbox can interfere with the `.pglite`
+files. If that is where the project lives, set `PGLITE_PATH` to an unsynced
+local path.
 
 ## Status
 

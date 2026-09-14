@@ -41,7 +41,21 @@ export async function handle(fn: () => Promise<Response>): Promise<Response> {
     }
 
     console.error("Unhandled error in route handler", error);
-    return json({ message: "Something went wrong." }, 500);
+
+    /*
+     * In development the real message is the whole point — a database that
+     * will not open says exactly what to do about it, and "Something went
+     * wrong" throws that away and leaves you staring at a blank screen. In
+     * production it stays generic, so internals are not handed to strangers.
+     */
+    const detail =
+      process.env.NODE_ENV === "production"
+        ? "Something went wrong."
+        : error instanceof Error
+          ? error.message
+          : String(error);
+
+    return json({ message: detail }, 500);
   }
 }
 
