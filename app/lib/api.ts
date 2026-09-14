@@ -14,9 +14,15 @@ import type { DashboardData } from "@/app/lib/types";
  *     treats the request as stateless and never attaches a session at all.
  */
 
-const BASE_URL = (
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
-).replace(/\/$/, "");
+/**
+ * Empty on purpose: requests go to this app's own origin and next.config.ts
+ * rewrites them to the API. That keeps the session cookie first-party, which is
+ * what makes auth work when the CRM and API sit on unrelated hosts.
+ *
+ * Set NEXT_PUBLIC_API_URL only to bypass the proxy and call the API directly —
+ * which requires the two to be same-site, or auth will fail.
+ */
+const BASE_URL = (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "");
 
 export class ApiError extends Error {
   constructor(

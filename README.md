@@ -27,9 +27,22 @@ lockfiles, or local installs and CI can silently resolve different trees.
 dashboard fed by [managerox-api](https://github.com/SaadAhmad915/managerox-api).
 The other eight sidebar destinations are real routes rendering a placeholder.
 
-**The API must be running** (`php artisan serve` on port 8000) or the app shows
-a sign-in failure. Set `NEXT_PUBLIC_API_URL` in `.env.local` — copy
-`.env.example` to start.
+**The API must be running** (`php artisan serve` on port 8000) or sign-in fails.
+Copy `.env.example` to `.env.local`; it sets `API_ORIGIN`.
+
+### The API is proxied, not called directly
+
+`next.config.ts` rewrites `/api/*` and `/sanctum/*` to the Laravel API, so the
+browser only ever talks to this app's own origin.
+
+That is not a convenience — it is what makes auth work. The session cookie is
+same-site only, so if the browser called the API directly on an unrelated host
+(`*.vercel.app` vs some API host) the cookie would never be sent and every
+request would 401 with nothing obviously wrong. Proxying keeps the cookie
+first-party and removes CORS from the picture entirely.
+
+`API_ORIGIN` has no `NEXT_PUBLIC_` prefix on purpose: the browser never learns
+the API's real address.
 
 | Route | State |
 | --- | --- |
