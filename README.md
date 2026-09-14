@@ -55,9 +55,15 @@ Three causes account for almost everything:
 - **The port.** Next moves to **3001** without complaining when 3000 is taken,
   so you can sit looking at a stale server on 3000 serving an older build. Open
   the URL Next actually printed.
-- **`localhost` vs `127.0.0.1`.** On Windows `localhost` can resolve to IPv6
-  `::1` while the dev server listens on IPv4, and the request then hangs with no
-  error at either end. **Try `http://127.0.0.1:3000`.**
+- **The host you open it as.** Next's dev server serves its client bundle only
+  to origins it has been told to trust. Open the app as anything else — the LAN
+  address it prints under "Network", a machine name — and React never hydrates:
+  no effect runs, the redirect to `/login` never happens, and the page sits on
+  its loading spinner for ever, with nothing in the console but a socket error.
+  `localhost` and `127.0.0.1` are both allowed; for any other host set
+  `DEV_ORIGIN` in `.env.local`. Note that `allowedDevOrigins` only matches
+  **exact** hosts — CIDR ranges and wildcards like `192.168.*.*` are silently
+  ignored, which is why they are not used here.
 - **The database.** The dev server prints "Ready" before it has touched it — the
   connection opens on the *first request* — so a database that never opens looks
   like a healthy server and a page that spins.

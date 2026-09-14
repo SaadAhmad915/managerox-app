@@ -64,3 +64,27 @@
 .tnum {
   font-variant-numeric: tabular-nums;
 }
+
+/*
+ * Revealed after a delay with no JavaScript involved.
+ *
+ * It backs the escape hatch on the loading screen: when the client bundle
+ * fails to load, nothing scripted ever runs, so a timer could not show it.
+ * An animation with a delay and `forwards` is handled entirely by the browser.
+ */
+.reveal-late {
+  opacity: 0;
+  animation: reveal-late 200ms ease-out 6s forwards;
+}
+
+@keyframes reveal-late {
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-late {
+    animation-duration: 1ms;
+  }
+}
